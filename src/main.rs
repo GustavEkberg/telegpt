@@ -8,6 +8,28 @@ use teloxide::{
     Bot,
 };
 
+fn clean_string(s: String) -> String {
+    s.replace('_', r"\_")
+        .replace('*', r"\*")
+        .replace('[', r"\[")
+        .replace(']', r"\]")
+        .replace('(', r"\(")
+        .replace(')', r"\)")
+        .replace('~', r"\~")
+        .replace('`', r"\`")
+        .replace('>', r"\>")
+        .replace('#', r"\#")
+        .replace('+', r"\+")
+        .replace('-', r"\-")
+        .replace('=', r"\=")
+        .replace('|', r"\|")
+        .replace('{', r"\{")
+        .replace('}', r"\}")
+        .replace('.', r"\.")
+        .replace('!', r"\!")
+        .replace(r"\`\`\`", r"```")
+}
+
 async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error + Send + Sync>> {
     let response = match message.kind.clone() {
         MessageKind::Common(message_data) => match message_data.media_kind {
@@ -17,7 +39,11 @@ async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error
         _ => None,
     };
 
-    bot.send_message(message.chat.id, response.unwrap()).await?;
+    println!("{}", clean_string(response.clone().unwrap()));
+    bot.send_message(message.chat.id, clean_string(response.unwrap()))
+        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+        .send()
+        .await?;
 
     Ok(())
 }
