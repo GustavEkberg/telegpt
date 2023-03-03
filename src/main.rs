@@ -31,21 +31,25 @@ fn clean_string(s: String) -> String {
 }
 
 async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let response = match message.kind.clone() {
-        MessageKind::Common(message_data) => match message_data.media_kind {
-            MediaKind::Text(text_data) => Some(send_to_chatgpt(text_data.text.as_str()).await),
+    if !message.chat.is_private() {
+        Ok(())
+    } else {
+        let response = match message.kind.clone() {
+            MessageKind::Common(message_data) => match message_data.media_kind {
+                MediaKind::Text(text_data) => Some(send_to_chatgpt(text_data.text.as_str()).await),
+                _ => None,
+            },
             _ => None,
-        },
-        _ => None,
-    };
+        };
 
-    println!("{}", clean_string(response.clone().unwrap()));
-    bot.send_message(message.chat.id, clean_string(response.unwrap()))
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-        .send()
-        .await?;
+        println!("{}", clean_string(response.clone().unwrap()));
+        bot.send_message(message.chat.id, clean_string(response.unwrap()))
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+            .send()
+            .await?;
 
-    Ok(())
+        Ok(())
+    }
 }
 
 pub async fn setup_bot() {
