@@ -116,7 +116,6 @@ async fn send_image_prompt_to_openai(message: &str) -> String {
         .await
         .unwrap();
 
-    println!("{}", response);
     let json: serde_json::Value = serde_json::from_str(&response).unwrap();
     json["data"][0]["url"]
         .as_str()
