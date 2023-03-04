@@ -1,6 +1,6 @@
 ### Telegpt
 
-Use Telegram to chat with OopenAI
+Use Telegram to chat with OpenAI
 
 `.env` file:
 ```
