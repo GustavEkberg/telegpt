@@ -34,6 +34,10 @@ async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error
     if !message.chat.is_private() {
         Ok(())
     } else {
+        bot.send_message(message.chat.id, "Hmmm.... let me think...")
+            .send()
+            .await?;
+
         let response = match message.kind.clone() {
             MessageKind::Common(message_data) => match message_data.media_kind {
                 MediaKind::Text(text_data) => Some(send_to_chatgpt(text_data.text.as_str()).await),
@@ -105,7 +109,6 @@ async fn send_to_chatgpt(message: &str) -> String {
 
     // Extract the generated text from the response
     let json: serde_json::Value = serde_json::from_str(&response).unwrap();
-    println!("JSON RESPONSE {:#?}", json);
     json["choices"][0]["message"]["content"]
         .as_str()
         .expect("No response from ChatGPT")
