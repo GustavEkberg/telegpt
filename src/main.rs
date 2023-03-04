@@ -16,7 +16,7 @@ fn clean_string(s: String) -> String {
         .replace('(', r"\(")
         .replace(')', r"\)")
         .replace('~', r"\~")
-        .replace('`', r"\`")
+        // .replace('`', r"\`")
         .replace('>', r"\>")
         .replace('#', r"\#")
         .replace('+', r"\+")
