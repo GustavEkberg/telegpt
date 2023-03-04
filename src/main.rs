@@ -1,10 +1,11 @@
 use dotenvy::dotenv;
+use reqwest::Url;
 use serde_json::json;
 use std::{env, error::Error};
 use teloxide::{
     dptree,
     prelude::*,
-    types::{MediaKind, MessageKind},
+    types::{InputFile, MediaKind, MessageEntityKind, MessageKind},
     Bot,
 };
 
@@ -38,19 +39,35 @@ async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error
             .send()
             .await?;
 
-        let response = match message.kind.clone() {
+        match message.kind.clone() {
             MessageKind::Common(message_data) => match message_data.media_kind {
-                MediaKind::Text(text_data) => Some(send_to_chatgpt(text_data.text.as_str()).await),
-                _ => None,
+                MediaKind::Text(text_data) => {
+                    if let Some(entity) = text_data.entities.first() {
+                        if entity.kind == MessageEntityKind::BotCommand
+                            && text_data.text.starts_with("/imagine")
+                        {
+                            let response = send_image_prompt_to_openai(
+                                text_data.text.to_string().replace("/imagine ", "").as_str(),
+                            )
+                            .await;
+                            bot.send_photo(
+                                message.chat.id,
+                                InputFile::url(Url::parse(&response).unwrap()),
+                            )
+                            .await?;
+                        }
+                    } else {
+                        let response = send_text_to_chatgpt(text_data.text.as_str()).await;
+                        bot.send_message(message.chat.id, clean_string(response))
+                            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                            .send()
+                            .await?;
+                    }
+                }
+                _ => (),
             },
-            _ => None,
+            _ => (),
         };
-
-        println!("{}", clean_string(response.clone().unwrap()));
-        bot.send_message(message.chat.id, clean_string(response.unwrap()))
-            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-            .send()
-            .await?;
 
         Ok(())
     }
@@ -71,13 +88,47 @@ pub async fn setup_bot() {
         .await;
 }
 
-async fn send_to_chatgpt(message: &str) -> String {
+async fn send_image_prompt_to_openai(message: &str) -> String {
+    println!("Sending image prompt {message} to opanAI");
+
+    let chatgpt_api_url = "https://api.openai.com/v1/images/generations";
+
+    let request_body =
+        json!({ "prompt": message, "n": 1, "size": "1024x1024", "response_format": "url" });
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(chatgpt_api_url)
+        .header("Content-Type", "application/json")
+        .header(
+            "Authorization",
+            format!(
+                "Bearer {}",
+                env::var("OPENAI_API_KEY").expect("Missing env variable OPENAI_API_KEY")
+            )
+            .as_str(),
+        )
+        .body(request_body.to_string())
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+
+    println!("{}", response);
+    let json: serde_json::Value = serde_json::from_str(&response).unwrap();
+    json["data"][0]["url"]
+        .as_str()
+        .expect("No response from OpenAI")
+        .to_string()
+}
+
+async fn send_text_to_chatgpt(message: &str) -> String {
     println!("Sending {message} to ChatGPT");
 
-    // We also need to specify the URL for the ChatGPT API
     let chatgpt_api_url = "https://api.openai.com/v1/chat/completions";
 
-    // Construct the request body for the ChatGPT API
     let request_body = json!({
           "model": "gpt-3.5-turbo",
           "messages": [{
@@ -86,7 +137,6 @@ async fn send_to_chatgpt(message: &str) -> String {
       }]
     });
 
-    // Send the request to the ChatGPT API and retrieve the response
     let client = reqwest::Client::new();
     let response = client
         .post(chatgpt_api_url)
