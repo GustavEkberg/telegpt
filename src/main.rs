@@ -50,11 +50,17 @@ async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error
                                 text_data.text.to_string().replace("/imagine ", "").as_str(),
                             )
                             .await;
-                            bot.send_photo(
-                                message.chat.id,
-                                InputFile::url(Url::parse(&response).unwrap()),
-                            )
-                            .await?;
+                            if response.is_err() {
+                                bot.send_message(message.chat.id, response.err().unwrap())
+                                    .send()
+                                    .await?;
+                            } else {
+                                bot.send_photo(
+                                    message.chat.id,
+                                    InputFile::url(Url::parse(&response.unwrap()).unwrap()),
+                                )
+                                .await?;
+                            }
                         }
                     } else {
                         let response = send_text_to_chatgpt(text_data.text.as_str()).await;
@@ -88,7 +94,7 @@ pub async fn setup_bot() {
         .await;
 }
 
-async fn send_image_prompt_to_openai(message: &str) -> String {
+async fn send_image_prompt_to_openai(message: &str) -> Result<String, String> {
     println!("Sending image prompt {message} to opanAI");
 
     let chatgpt_api_url = "https://api.openai.com/v1/images/generations";
@@ -117,10 +123,14 @@ async fn send_image_prompt_to_openai(message: &str) -> String {
         .unwrap();
 
     let json: serde_json::Value = serde_json::from_str(&response).unwrap();
-    json["data"][0]["url"]
-        .as_str()
-        .expect("No response from OpenAI")
-        .to_string()
+    if let Some(error) = json["error"]["message"].as_str() {
+        Err(error.to_string())
+    } else {
+        Ok(json["data"][0]["url"]
+            .as_str()
+            .expect("No response from OpenAI")
+            .to_string())
+    }
 }
 
 async fn send_text_to_chatgpt(message: &str) -> String {
