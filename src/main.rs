@@ -4,10 +4,21 @@ use serde_json::json;
 use std::{env, error::Error};
 use teloxide::{
     dptree,
+    macros::BotCommands,
     prelude::*,
     types::{InputFile, MediaKind, MessageEntityKind, MessageKind},
     Bot,
 };
+
+#[derive(BotCommands, Clone)]
+#[command(rename_rule = "lowercase", description = "OpenAI commands")]
+enum OpenAICommands {
+    #[command(description = "Ask ChatHPT a question")]
+    Ask,
+
+    #[command(description = "Generate an image")]
+    Imagine,
+}
 
 fn clean_string(s: String) -> String {
     s.replace('_', r"\_")
@@ -29,6 +40,37 @@ fn clean_string(s: String) -> String {
         .replace('.', r"\.")
         .replace('!', r"\!")
         .replace(r"\`\`\`", r"```")
+}
+
+async fn bot_handler(
+    message: Message,
+    bot: Bot,
+    cmd: OpenAICommands,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    match cmd {
+        OpenAICommands::Ask => {
+            let response = send_text_to_chatgpt(message.text().unwrap()).await;
+            bot.send_message(message.chat.id, clean_string(response))
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .send()
+                .await?;
+        }
+        OpenAICommands::Imagine => {
+            let response = send_image_prompt_to_openai(message.text().unwrap()).await;
+            if response.is_err() {
+                bot.send_message(message.chat.id, response.err().unwrap())
+                    .send()
+                    .await?;
+            } else {
+                bot.send_photo(
+                    message.chat.id,
+                    InputFile::url(Url::parse(&response.unwrap()).unwrap()),
+                )
+                .await?;
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -85,7 +127,13 @@ pub async fn setup_bot() {
     let bot =
         Bot::new(std::env::var("TELEGRAM_TOKEN").expect("Missing env variable TELEGRAM_TOKEN"));
 
-    let handler = dptree::entry().branch(Update::filter_message().endpoint(message_handler));
+    let handler = Update::filter_message()
+        .branch(
+            dptree::entry()
+                .filter_command::<OpenAICommands>()
+                .endpoint(bot_handler),
+        )
+        .branch(dptree::entry().endpoint(message_handler));
 
     Dispatcher::builder(bot, handler)
         .enable_ctrlc_handler()
