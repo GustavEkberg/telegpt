@@ -6,7 +6,7 @@ use teloxide::{
     dptree,
     macros::BotCommands,
     prelude::*,
-    types::{InputFile, MediaKind, MessageEntityKind, MessageKind},
+    types::{InputFile, MediaKind, MessageKind},
     Bot,
 };
 
@@ -47,6 +47,9 @@ async fn bot_handler(
     bot: Bot,
     cmd: OpenAICommands,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    bot.send_message(message.chat.id, "Hmmm.... let me think...")
+        .send()
+        .await?;
     match cmd {
         OpenAICommands::Ask => {
             let response = send_text_to_chatgpt(message.text().unwrap()).await;
@@ -84,33 +87,11 @@ async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error
         match message.kind.clone() {
             MessageKind::Common(message_data) => match message_data.media_kind {
                 MediaKind::Text(text_data) => {
-                    if let Some(entity) = text_data.entities.first() {
-                        if entity.kind == MessageEntityKind::BotCommand
-                            && text_data.text.starts_with("/imagine")
-                        {
-                            let response = send_image_prompt_to_openai(
-                                text_data.text.to_string().replace("/imagine ", "").as_str(),
-                            )
-                            .await;
-                            if response.is_err() {
-                                bot.send_message(message.chat.id, response.err().unwrap())
-                                    .send()
-                                    .await?;
-                            } else {
-                                bot.send_photo(
-                                    message.chat.id,
-                                    InputFile::url(Url::parse(&response.unwrap()).unwrap()),
-                                )
-                                .await?;
-                            }
-                        }
-                    } else {
-                        let response = send_text_to_chatgpt(text_data.text.as_str()).await;
-                        bot.send_message(message.chat.id, clean_string(response))
-                            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                            .send()
-                            .await?;
-                    }
+                    let response = send_text_to_chatgpt(text_data.text.as_str()).await;
+                    bot.send_message(message.chat.id, clean_string(response))
+                        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                        .send()
+                        .await?;
                 }
                 _ => (),
             },
