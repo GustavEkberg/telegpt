@@ -170,9 +170,12 @@ async fn send_text_to_chatgpt(message: &str) -> String {
     let request_body = json!({
           "model": "gpt-3.5-turbo",
           "messages": [{
+              "role": "system",
+              "content": "You are ChatGPT, a large language model trained by OpenAI. Answer as concisely as possible but clarify what data you base your answers on."
+          },{
               "role": "user",
               "content": message
-      }]
+          }]
     });
 
     let client = reqwest::Client::new();
