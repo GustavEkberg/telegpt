@@ -9,15 +9,21 @@ use teloxide::{
     types::{InputFile, MediaKind, MessageKind},
     Bot,
 };
+use user::{init_user, set_user, User};
+
+mod user;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "OpenAI commands")]
-enum OpenAICommands {
+enum BotCommands {
     #[command(description = "Ask ChatHPT a question")]
     Ask,
 
     #[command(description = "Generate an image")]
     Imagine,
+
+    #[command(description = "Pretend the bot to be something else")]
+    Pretend,
 }
 
 fn clean_string(s: String) -> String {
@@ -45,20 +51,43 @@ fn clean_string(s: String) -> String {
 async fn bot_handler(
     message: Message,
     bot: Bot,
-    cmd: OpenAICommands,
+    cmd: BotCommands,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let user_id = message.from().unwrap().id;
+    let mut user = init_user(
+        &user_id.0,
+        message.from().unwrap().username.clone().unwrap(),
+    )
+    .await
+    .unwrap();
+
+    if !user.has_requests_left() {
+        bot.send_message(
+            user_id,
+            "You have no requests left, you can purhcase more with /buy",
+        )
+        .send()
+        .await?;
+        return Ok(());
+    }
+
     bot.send_message(message.chat.id, "Hmmm.... let me think...")
         .send()
         .await?;
+
     match cmd {
-        OpenAICommands::Ask => {
-            let response = send_text_to_chatgpt(message.text().unwrap()).await;
+        BotCommands::Ask => {
+            user.update_requests();
+            user.previous_messages
+                .push(message.text().unwrap().replace("/ask ", ""));
+            let response = send_text_to_chatgpt(message.text().unwrap(), &user).await;
             bot.send_message(message.chat.id, clean_string(response))
                 .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                 .send()
                 .await?;
         }
-        OpenAICommands::Imagine => {
+        BotCommands::Imagine => {
+            user.update_requests();
             let response = send_image_prompt_to_openai(message.text().unwrap()).await;
             if response.is_err() {
                 bot.send_message(message.chat.id, response.err().unwrap())
@@ -72,7 +101,23 @@ async fn bot_handler(
                 .await?;
             }
         }
+        BotCommands::Pretend => {
+            user.pretend = Some(message.text().unwrap().replace("/pretend ", "").to_string());
+            bot.send_message(
+                message.chat.id,
+                format!(
+                    "From now on, I'll pretend \"{}\"",
+                    message.text().unwrap().replace("/pretend ", "")
+                ),
+            )
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+            .send()
+            .await?;
+        }
     }
+
+    set_user(user.clone()).await.unwrap();
+    println!("User: {:?}", user);
     Ok(())
 }
 
@@ -80,6 +125,27 @@ async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error
     if !message.chat.is_private() {
         Ok(())
     } else {
+        let user_id = message.from().unwrap().id;
+        let mut user = init_user(
+            &user_id.0,
+            message.from().unwrap().username.clone().unwrap(),
+        )
+        .await
+        .unwrap();
+
+        if !user.has_requests_left() {
+            bot.send_message(
+                user_id,
+                "You have no requests left, you can purhcase more with /buy",
+            )
+            .send()
+            .await?;
+            return Ok(());
+        }
+
+        user.requests_left -= 1;
+        set_user(user.clone()).await.unwrap();
+
         bot.send_message(message.chat.id, "Hmmm.... let me think...")
             .send()
             .await?;
@@ -87,7 +153,10 @@ async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error
         match message.kind.clone() {
             MessageKind::Common(message_data) => match message_data.media_kind {
                 MediaKind::Text(text_data) => {
-                    let response = send_text_to_chatgpt(text_data.text.as_str()).await;
+                    user.previous_messages
+                        .push(message.text().unwrap().replace("/ask ", ""));
+
+                    let response = send_text_to_chatgpt(text_data.text.as_str(), &user).await;
                     bot.send_message(message.chat.id, clean_string(response))
                         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                         .send()
@@ -111,7 +180,7 @@ pub async fn setup_bot() {
     let handler = Update::filter_message()
         .branch(
             dptree::entry()
-                .filter_command::<OpenAICommands>()
+                .filter_command::<BotCommands>()
                 .endpoint(bot_handler),
         )
         .branch(dptree::entry().endpoint(message_handler));
@@ -162,16 +231,18 @@ async fn send_image_prompt_to_openai(message: &str) -> Result<String, String> {
     }
 }
 
-async fn send_text_to_chatgpt(message: &str) -> String {
+async fn send_text_to_chatgpt(message: &str, user: &User) -> String {
     println!("Sending {message} to ChatGPT");
 
     let chatgpt_api_url = "https://api.openai.com/v1/chat/completions";
+
+    let role = user.pretend.clone().unwrap_or("You are ChatGPT, a large language model trained by OpenAI. Answer as concisely as possible but clarify what data you base your answers on.".to_string());
 
     let request_body = json!({
           "model": "gpt-3.5-turbo",
           "messages": [{
               "role": "system",
-              "content": "You are ChatGPT, a large language model trained by OpenAI. Answer as concisely as possible but clarify what data you base your answers on."
+              "content": role
           },{
               "role": "user",
               "content": message
