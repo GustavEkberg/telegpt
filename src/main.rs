@@ -1,5 +1,6 @@
 use dotenvy::dotenv;
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{env, error::Error};
 use teloxide::{
@@ -24,6 +25,12 @@ enum BotCommands {
 
     #[command(description = "Pretend the bot to be something else")]
     Pretend,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct OpenAIMessage {
+    content: String,
+    role: String,
 }
 
 fn clean_string(s: String) -> String {
@@ -78,13 +85,12 @@ async fn bot_handler(
     match cmd {
         BotCommands::Ask => {
             user.update_requests();
-            user.previous_messages
-                .push(message.text().unwrap().replace("/ask ", ""));
             let response = send_text_to_chatgpt(message.text().unwrap(), &user).await;
-            bot.send_message(message.chat.id, clean_string(response))
+            bot.send_message(message.chat.id, clean_string(response.unwrap()))
                 .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                 .send()
                 .await?;
+            user.update_last_message(message.text().unwrap().to_string());
         }
         BotCommands::Imagine => {
             user.update_requests();
@@ -121,7 +127,10 @@ async fn bot_handler(
     Ok(())
 }
 
-async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn private_message_handler(
+    bot: Bot,
+    message: Message,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     if !message.chat.is_private() {
         Ok(())
     } else {
@@ -143,7 +152,7 @@ async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error
             return Ok(());
         }
 
-        user.requests_left -= 1;
+        user.update_requests();
         set_user(user.clone()).await.unwrap();
 
         bot.send_message(message.chat.id, "Hmmm.... let me think...")
@@ -153,20 +162,22 @@ async fn message_handler(bot: Bot, message: Message) -> Result<(), Box<dyn Error
         match message.kind.clone() {
             MessageKind::Common(message_data) => match message_data.media_kind {
                 MediaKind::Text(text_data) => {
-                    user.previous_messages
-                        .push(message.text().unwrap().replace("/ask ", ""));
-
                     let response = send_text_to_chatgpt(text_data.text.as_str(), &user).await;
-                    bot.send_message(message.chat.id, clean_string(response))
+                    bot.send_message(message.chat.id, clean_string(response.unwrap()))
                         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                         .send()
                         .await?;
+
+                    user.update_last_message(message.text().unwrap().to_string());
                 }
                 _ => (),
             },
             _ => (),
         };
 
+        set_user(user.clone()).await.unwrap();
+
+        println!("User: {:#?}", user);
         Ok(())
     }
 }
@@ -183,7 +194,7 @@ pub async fn setup_bot() {
                 .filter_command::<BotCommands>()
                 .endpoint(bot_handler),
         )
-        .branch(dptree::entry().endpoint(message_handler));
+        .branch(dptree::entry().endpoint(private_message_handler));
 
     Dispatcher::builder(bot, handler)
         .enable_ctrlc_handler()
@@ -231,23 +242,41 @@ async fn send_image_prompt_to_openai(message: &str) -> Result<String, String> {
     }
 }
 
-async fn send_text_to_chatgpt(message: &str, user: &User) -> String {
+async fn send_text_to_chatgpt(message: &str, user: &User) -> Result<String, String> {
     println!("Sending {message} to ChatGPT");
 
     let chatgpt_api_url = "https://api.openai.com/v1/chat/completions";
 
-    let role = user.pretend.clone().unwrap_or("You are ChatGPT, a large language model trained by OpenAI. Answer as concisely as possible but clarify what data you base your answers on.".to_string());
+    let system_role = user.pretend.clone().unwrap_or("You are ChatGPT, a large language model trained by OpenAI. Answer as concisely as possible but clarify what data you base your answers on.".to_string());
+
+    let mut messages: Vec<OpenAIMessage> = user
+        .previous_messages
+        .iter()
+        .map(|m| OpenAIMessage {
+            role: "user".to_string(),
+            content: m.to_string(),
+        })
+        .collect();
+
+    messages.push(OpenAIMessage {
+        content: message.to_string(),
+        role: "user".to_string(),
+    });
+
+    messages.insert(
+        0,
+        OpenAIMessage {
+            content: system_role,
+            role: "system".to_string(),
+        },
+    );
 
     let request_body = json!({
           "model": "gpt-3.5-turbo",
-          "messages": [{
-              "role": "system",
-              "content": role
-          },{
-              "role": "user",
-              "content": message
-          }]
+          "messages": messages
     });
+
+    println!("Request body: {:#?}", request_body);
 
     let client = reqwest::Client::new();
     let response = client
@@ -271,10 +300,14 @@ async fn send_text_to_chatgpt(message: &str, user: &User) -> String {
 
     // Extract the generated text from the response
     let json: serde_json::Value = serde_json::from_str(&response).unwrap();
-    json["choices"][0]["message"]["content"]
-        .as_str()
-        .expect("No response from ChatGPT")
-        .to_string()
+    if let Some(error) = json["error"]["message"].as_str() {
+        Err(error.to_string())
+    } else {
+        Ok(json["choices"][0]["message"]["content"]
+            .as_str()
+            .expect("No response from ChatGPT")
+            .to_string())
+    }
 }
 
 #[tokio::main]

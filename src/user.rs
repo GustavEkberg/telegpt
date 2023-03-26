@@ -33,6 +33,13 @@ impl User {
         self.requests_left -= 1;
         self.total_request += 1;
     }
+
+    pub fn update_last_message(&mut self, message: String) {
+        if self.previous_messages.len() > 5 {
+            self.previous_messages.remove(0);
+        }
+        self.previous_messages.push(message);
+    }
 }
 
 pub async fn init_user(id: &u64, username: String) -> Result<User, Box<dyn std::error::Error>> {
