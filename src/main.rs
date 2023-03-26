@@ -120,7 +120,7 @@ async fn bot_handler(
         }
         BotCommands::Status => {
             bot.send_message(
-                message.chat.id,
+                message.from().unwrap().id,
                 format!("You have {} requests left.", user.requests_left),
             )
             .send()
@@ -149,12 +149,9 @@ async fn private_message_handler(
         .unwrap();
 
         if !user.has_requests_left() {
-            bot.send_message(
-                user_id,
-                "You have no requests left, you can purhcase more with /buy",
-            )
-            .send()
-            .await?;
+            bot.send_message(user_id, "You have no requests left.")
+                .send()
+                .await?;
             return Ok(());
         }
 
