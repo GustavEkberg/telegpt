@@ -4,7 +4,7 @@ use surrealdb;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
     pub telegram_id: u64,
-    pub username: String,
+    pub username: Option<String>,
     pub requests_left: u32,
     pub pretend: Option<String>,
     pub previous_messages: Vec<String>,
@@ -13,7 +13,7 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(telegram_id: u64, username: String) -> Self {
+    pub fn new(telegram_id: u64, username: Option<String>) -> Self {
         Self {
             telegram_id,
             username,
@@ -42,7 +42,10 @@ impl User {
     }
 }
 
-pub async fn init_user(id: &u64, username: String) -> Result<User, Box<dyn std::error::Error>> {
+pub async fn init_user(
+    id: &u64,
+    username: Option<String>,
+) -> Result<User, Box<dyn std::error::Error>> {
     let user = get_user(&id)
         .await
         .unwrap()

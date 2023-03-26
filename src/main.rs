@@ -59,12 +59,9 @@ async fn bot_handler(
     cmd: BotCommands,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let user_id = message.from().unwrap().id;
-    let mut user = init_user(
-        &user_id.0,
-        message.from().unwrap().username.clone().unwrap(),
-    )
-    .await
-    .unwrap();
+    let mut user = init_user(&user_id.0, message.from().unwrap().username.clone())
+        .await
+        .unwrap();
 
     if !user.has_requests_left() {
         bot.send_message(user_id, "You have no requests left")
@@ -141,12 +138,9 @@ async fn private_message_handler(
         Ok(())
     } else {
         let user_id = message.from().unwrap().id;
-        let mut user = init_user(
-            &user_id.0,
-            message.from().unwrap().username.clone().unwrap(),
-        )
-        .await
-        .unwrap();
+        let mut user = init_user(&user_id.0, message.from().unwrap().username.clone())
+            .await
+            .unwrap();
 
         if !user.has_requests_left() {
             bot.send_message(user_id, "You have no requests left.")
