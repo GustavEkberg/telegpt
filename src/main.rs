@@ -71,16 +71,31 @@ async fn bot_handler(
     }
     match cmd {
         BotCommands::Ask => {
+            let message_text = message
+                .text()
+                .unwrap()
+                .replace("/ask", "")
+                .trim()
+                .to_string();
+
+            if message_text.len() == 0 {
+                bot.send_message(message.chat.id, "Please provide a question")
+                    .send()
+                    .await?;
+                return Ok(());
+            }
+
             bot.send_message(message.chat.id, "Hmmm.... let me think...")
                 .send()
                 .await?;
 
-            user.update_requests();
-            let response = send_text_to_chatgpt(message.text().unwrap(), &user).await;
+            let response = send_text_to_chatgpt(&message_text, &user).await;
             bot.send_message(message.chat.id, clean_string(response.unwrap()))
                 .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                 .send()
                 .await?;
+
+            user.update_requests();
             user.update_last_message(message.text().unwrap().to_string());
         }
         BotCommands::Imagine => {
