@@ -26,6 +26,9 @@ enum BotCommands {
 
     #[command(description = "Pretend the bot to be something else")]
     Pretend,
+
+    #[command(description = "Display your status")]
+    Status,
 }
 
 fn clean_string(s: String) -> String {
@@ -64,21 +67,17 @@ async fn bot_handler(
     .unwrap();
 
     if !user.has_requests_left() {
-        bot.send_message(
-            user_id,
-            "You have no requests left, you can purhcase more with /buy",
-        )
-        .send()
-        .await?;
+        bot.send_message(user_id, "You have no requests left")
+            .send()
+            .await?;
         return Ok(());
     }
-
-    bot.send_message(message.chat.id, "Hmmm.... let me think...")
-        .send()
-        .await?;
-
     match cmd {
         BotCommands::Ask => {
+            bot.send_message(message.chat.id, "Hmmm.... let me think...")
+                .send()
+                .await?;
+
             user.update_requests();
             let response = send_text_to_chatgpt(message.text().unwrap(), &user).await;
             bot.send_message(message.chat.id, clean_string(response.unwrap()))
@@ -88,6 +87,10 @@ async fn bot_handler(
             user.update_last_message(message.text().unwrap().to_string());
         }
         BotCommands::Imagine => {
+            bot.send_message(message.chat.id, "Hmmm.... let me think...")
+                .send()
+                .await?;
+
             user.update_requests();
             let response = send_image_prompt_to_openai(message.text().unwrap()).await;
             if response.is_err() {
@@ -112,6 +115,14 @@ async fn bot_handler(
                 ),
             )
             .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+            .send()
+            .await?;
+        }
+        BotCommands::Status => {
+            bot.send_message(
+                message.chat.id,
+                format!("You have {} requests left.", user.requests_left),
+            )
             .send()
             .await?;
         }
