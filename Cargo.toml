@@ -13,3 +13,4 @@ reqwest = "0.11.14"
 surrealdb = "1.0.0-beta.8"
 teloxide = { version = "0.12.2", features = ["macros"] }
 tokio = { version =  "1.8", features = ["full"] }
+chrono = "0.4.24"

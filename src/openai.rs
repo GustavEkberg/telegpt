@@ -83,8 +83,6 @@ pub async fn send_text_to_chatgpt(message: &str, user: &User) -> Result<String, 
           "messages": messages
     });
 
-    println!("Request body: {:#?}", request_body);
-
     let client = reqwest::Client::new();
     let response = client
         .post(chatgpt_api_url)

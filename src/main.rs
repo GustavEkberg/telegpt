@@ -1,3 +1,4 @@
+use chrono::{TimeZone, Utc};
 use dotenvy::dotenv;
 use reqwest::Url;
 use std::error::Error;
@@ -96,7 +97,7 @@ async fn bot_handler(
                 .await?;
 
             user.update_requests();
-            user.update_last_message(message.text().unwrap().to_string());
+            user.update_last_message(message_text);
         }
         BotCommands::Imagine => {
             bot.send_message(message.chat.id, "Hmmm.... let me think...")
@@ -133,7 +134,11 @@ async fn bot_handler(
         BotCommands::Status => {
             bot.send_message(
                 message.from().unwrap().id,
-                format!("You have {} requests left.", user.requests_left),
+                format!(
+                    "You have preformed {} requests since {}.",
+                    user.total_request,
+                    Utc.timestamp_opt(user.created_at, 0).unwrap()
+                ),
             )
             .send()
             .await?;
@@ -141,7 +146,6 @@ async fn bot_handler(
     }
 
     set_user(user.clone()).await.unwrap();
-    println!("User: {:?}", user);
     Ok(())
 }
 
@@ -189,7 +193,6 @@ async fn private_message_handler(
 
         set_user(user.clone()).await.unwrap();
 
-        println!("User: {:#?}", user);
         Ok(())
     }
 }

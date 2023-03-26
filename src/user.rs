@@ -1,3 +1,4 @@
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use surrealdb;
 
@@ -10,6 +11,7 @@ pub struct User {
     pub previous_messages: Vec<String>,
     pub last_message: Option<u64>,
     pub total_request: u32,
+    pub created_at: i64,
 }
 
 impl User {
@@ -22,6 +24,7 @@ impl User {
             previous_messages: Vec::new(),
             last_message: None,
             total_request: 0,
+            created_at: Utc::now().timestamp(),
         }
     }
 
@@ -51,6 +54,8 @@ pub async fn init_user(
         .unwrap()
         .or(Some(User::new(id.clone(), username)))
         .unwrap();
+
+    println!("USER: {:#?}", user);
 
     Ok(user)
 }
