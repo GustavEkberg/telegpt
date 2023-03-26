@@ -2,8 +2,9 @@
 
 Use Telegram to communicate with OpenAI
 
-`.env` file:
+Environment variables:
 ```
   TELEGRAM_TOKEN
   OPENAI_API_KEY
+  DB_ENDPOINT
 ```
