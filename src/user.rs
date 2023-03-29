@@ -38,10 +38,14 @@ impl User {
     }
 
     pub fn update_last_message(&mut self, message: String) {
-        if self.previous_messages.len() > 5 {
+        if self.previous_messages.len() > 3 {
             self.previous_messages.remove(0);
         }
         self.previous_messages.push(message);
+    }
+
+    pub fn clear_history(&mut self) {
+        self.previous_messages.clear();
     }
 }
 

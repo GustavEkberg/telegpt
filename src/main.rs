@@ -35,6 +35,9 @@ enum BotCommands {
 
     #[command(description = "Summarize the content of a website")]
     Summarize,
+
+    #[command(description = "Clear your chat history")]
+    Clear,
 }
 
 fn clean_string(s: String) -> String {
@@ -179,7 +182,7 @@ async fn bot_handler(
             }
 
             let content = content.unwrap();
-            let content_message = format!("Summarize the following content, ignoring any mentions of subscribing to a newspaper or magazine. Url: \"{url}\". \n\n Content: \n\"{content}\"");
+            let content_message = format!("Summarize the following content, ignoring any mentions of subscribing to a newspaper or magazine. Try to summarize it in a list format. ---- \nUrl: \"{url}\". \n\n Content: \n\"{content}\"");
 
             let response = send_text_to_chatgpt(&content_message, &user).await;
 
@@ -190,6 +193,12 @@ async fn bot_handler(
 
             user.update_requests();
             user.update_last_message(content_message);
+        }
+        BotCommands::Clear => {
+            user.clear_history();
+            bot.send_message(message.from().unwrap().id, "Chat history cleared!")
+                .send()
+                .await?;
         }
     }
 
