@@ -1,4 +1,5 @@
 use chrono::{TimeZone, Utc};
+use content::extract_url_content;
 use dotenvy::dotenv;
 use reqwest::Url;
 use std::error::Error;
@@ -6,13 +7,14 @@ use teloxide::{
     dptree,
     macros::BotCommands,
     prelude::*,
-    types::{InputFile, MediaKind, MessageKind},
+    types::{InputFile, MediaKind, MessageEntityKind, MessageKind},
     Bot,
 };
 use user::{init_user, set_user};
 
 use crate::openai::{send_image_prompt_to_openai, send_text_to_chatgpt};
 
+mod content;
 mod openai;
 mod user;
 
@@ -30,6 +32,9 @@ enum BotCommands {
 
     #[command(description = "Display your status")]
     Status,
+
+    #[command(description = "Summarize the content of a website")]
+    Summarize,
 }
 
 fn clean_string(s: String) -> String {
@@ -142,6 +147,49 @@ async fn bot_handler(
             )
             .send()
             .await?;
+        }
+        BotCommands::Summarize => {
+            bot.send_message(message.chat.id, "Hmmm.... let me think...")
+                .send()
+                .await?;
+
+            let url_position = if let Some(message) = message
+                .entities()
+                .unwrap()
+                .iter()
+                .find(|entity| entity.kind.eq(&MessageEntityKind::Url))
+            {
+                (message.offset, message.length)
+            } else {
+                bot.send_message(message.chat.id, "Please provide a url to summarize")
+                    .send()
+                    .await?;
+                return Ok(());
+            };
+
+            let url = message.text().unwrap()[url_position.0..url_position.0 + url_position.1]
+                .to_string();
+            let content = extract_url_content(&url).await.unwrap();
+
+            if content.is_none() {
+                bot.send_message(message.chat.id, "Could not extract content from url")
+                    .send()
+                    .await?;
+                return Ok(());
+            }
+
+            let content = content.unwrap();
+            let content_message = format!("Summarize the following content, ignoring any mentions of subscribing to a newspaper or magazine. Url: \"{url}\". \n\n Content: \n\"{content}\"");
+
+            let response = send_text_to_chatgpt(&content_message, &user).await;
+
+            bot.send_message(message.chat.id, clean_string(response.unwrap()))
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .send()
+                .await?;
+
+            user.update_requests();
+            user.update_last_message(content_message);
         }
     }
 
