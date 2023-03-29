@@ -4,14 +4,32 @@ use scraper::{ElementRef, Html, Selector};
 use std::error::Error;
 
 pub async fn extract_url_content(url: &str) -> Result<Option<String>, Box<dyn Error>> {
-    let client = Client::new();
+    let client = Client::builder()
+        .user_agent("Mozilla/5.0 (Linux; Android 7.0; SM-G930V Build/NRD90M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.125 Mobile Safari/537.36")
+        .build()
+        .unwrap();
+
     let response = client.get(url).send().await?;
     let html = response.text().await?;
     let parsed_html = Html::parse_document(&html);
 
-    let all_elements = parsed_html
-        .select(&Selector::parse("main, div, span, article").unwrap())
+    let mut all_elements = parsed_html
+        .select(&Selector::parse("main").unwrap())
         .collect::<Vec<_>>();
+
+    dbg!(all_elements.len());
+    if all_elements.is_empty() {
+        all_elements = parsed_html
+            .select(&Selector::parse("article").unwrap())
+            .collect::<Vec<_>>();
+    }
+
+    if all_elements.is_empty() {
+        all_elements = parsed_html
+            .select(&Selector::parse("span, div").unwrap())
+            .collect::<Vec<_>>();
+    }
+
     let mut max_text_len = 0;
     let mut main_content: Option<ElementRef> = None;
 
@@ -27,7 +45,15 @@ pub async fn extract_url_content(url: &str) -> Result<Option<String>, Box<dyn Er
         }
     }
 
-    let excluded = vec!["nav", "footer", "header", "script", "style", "sidebar"];
+    let excluded = vec![
+        "nav",
+        "footer",
+        "header",
+        "script",
+        "style",
+        "sidebar",
+        "content_below",
+    ];
 
     let mut result = Vec::new();
 
@@ -61,7 +87,7 @@ pub async fn extract_url_content(url: &str) -> Result<Option<String>, Box<dyn Er
                     let trimmed = img_regex.replace_all(text_node.trim(), "");
 
                     if !trimmed.is_empty() {
-                        result.push(trimmed.to_string());
+                        result.insert(0, trimmed.to_string());
                     }
                 }
                 _ => (),
