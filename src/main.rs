@@ -1,5 +1,5 @@
+use bot::summarize;
 use chrono::{TimeZone, Utc};
-use content::extract_url_content;
 use dotenvy::dotenv;
 use reqwest::Url;
 use std::error::Error;
@@ -14,6 +14,7 @@ use user::{init_user, set_user};
 
 use crate::openai::{send_image_prompt_to_openai, send_text_to_chatgpt};
 
+mod bot;
 mod content;
 mod openai;
 mod user;
@@ -40,7 +41,7 @@ enum BotCommands {
     Clear,
 }
 
-fn clean_string(s: String) -> String {
+pub fn clean_string(s: String) -> String {
     s.replace('_', r"\_")
         .replace('*', r"\*")
         .replace('[', r"\[")
@@ -106,6 +107,7 @@ async fn bot_handler(
 
             user.update_requests();
             user.update_last_message(message_text);
+            set_user(user.clone()).await.unwrap();
         }
         BotCommands::Imagine => {
             bot.send_message(message.chat.id, "Hmmm.... let me think...")
@@ -125,6 +127,7 @@ async fn bot_handler(
                 )
                 .await?;
             }
+            set_user(user.clone()).await.unwrap();
         }
         BotCommands::Pretend => {
             user.pretend = Some(message.text().unwrap().replace("/pretend ", "").to_string());
@@ -138,6 +141,7 @@ async fn bot_handler(
             .parse_mode(teloxide::types::ParseMode::MarkdownV2)
             .send()
             .await?;
+            set_user(user.clone()).await.unwrap();
         }
         BotCommands::Status => {
             bot.send_message(
@@ -152,58 +156,17 @@ async fn bot_handler(
             .await?;
         }
         BotCommands::Summarize => {
-            bot.send_message(message.chat.id, "Hmmm.... let me think...")
-                .send()
-                .await?;
-
-            let url_position = if let Some(message) = message
-                .entities()
-                .unwrap()
-                .iter()
-                .find(|entity| entity.kind.eq(&MessageEntityKind::Url))
-            {
-                (message.offset, message.length)
-            } else {
-                bot.send_message(message.chat.id, "Please provide a url to summarize")
-                    .send()
-                    .await?;
-                return Ok(());
-            };
-
-            let url = message.text().unwrap()[url_position.0..url_position.0 + url_position.1]
-                .to_string();
-            let content = extract_url_content(&url).await.unwrap();
-
-            if content.is_none() {
-                bot.send_message(message.chat.id, "Could not extract content from url")
-                    .send()
-                    .await?;
-                return Ok(());
-            }
-
-            user.clear_history();
-            let content = content.unwrap();
-            let content_message = format!("Summarize the following content, ignoring any mentions of subscribing to a newspaper or magazine. Try to summarize it in a list format. ---- \nUrl: \"{url}\". \n\n Content: \n\"{content}\"");
-
-            let response = send_text_to_chatgpt(&content_message, &user).await;
-
-            bot.send_message(message.chat.id, clean_string(response.unwrap()))
-                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                .send()
-                .await?;
-
-            user.update_requests();
-            user.update_last_message(content_message);
+            summarize(bot, message, user).await.unwrap();
         }
         BotCommands::Clear => {
             user.clear_history();
             bot.send_message(message.from().unwrap().id, "Chat history cleared!")
                 .send()
                 .await?;
+            set_user(user.clone()).await.unwrap();
         }
     }
 
-    set_user(user.clone()).await.unwrap();
     Ok(())
 }
 
@@ -227,29 +190,35 @@ async fn private_message_handler(
         }
 
         user.update_requests();
-        set_user(user.clone()).await.unwrap();
-
-        bot.send_message(message.chat.id, "Hmmm.... let me think...")
-            .send()
-            .await?;
 
         match message.kind.clone() {
             MessageKind::Common(message_data) => match message_data.media_kind {
                 MediaKind::Text(text_data) => {
-                    let response = send_text_to_chatgpt(text_data.text.as_str(), &user).await;
-                    bot.send_message(message.chat.id, clean_string(response.unwrap()))
-                        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                        .send()
-                        .await?;
+                    if let Some(_) = message
+                        .entities()
+                        .unwrap()
+                        .iter()
+                        .find(|entity| entity.kind.eq(&MessageEntityKind::Url))
+                    {
+                        summarize(bot, message, user).await.unwrap();
+                    } else {
+                        bot.send_message(message.chat.id, "Hmmm.... let me think...")
+                            .send()
+                            .await?;
 
-                    user.update_last_message(message.text().unwrap().to_string());
+                        let response = send_text_to_chatgpt(text_data.text.as_str(), &user).await;
+                        bot.send_message(message.chat.id, clean_string(response.unwrap()))
+                            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                            .send()
+                            .await?;
+                        user.update_last_message(message.text().unwrap().to_string());
+                        set_user(user.clone()).await.unwrap();
+                    }
                 }
                 _ => (),
             },
             _ => (),
         };
-
-        set_user(user.clone()).await.unwrap();
 
         Ok(())
     }
