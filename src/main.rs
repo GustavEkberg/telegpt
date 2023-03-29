@@ -181,6 +181,7 @@ async fn bot_handler(
                 return Ok(());
             }
 
+            user.clear_history();
             let content = content.unwrap();
             let content_message = format!("Summarize the following content, ignoring any mentions of subscribing to a newspaper or magazine. Try to summarize it in a list format. ---- \nUrl: \"{url}\". \n\n Content: \n\"{content}\"");
 
