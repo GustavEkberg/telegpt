@@ -1,6 +1,5 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use surrealdb;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
@@ -53,13 +52,12 @@ pub async fn init_user(
     id: &u64,
     username: Option<String>,
 ) -> Result<User, Box<dyn std::error::Error>> {
-    let user = get_user(&id)
+    let user = get_user(id)
         .await
         .unwrap()
-        .or(Some(User::new(id.clone(), username)))
-        .unwrap();
+        .unwrap_or(User::new(*id, username));
 
-    println!("USER: {:#?}", user);
+    println!("USER: {user:#?}");
 
     Ok(user)
 }

@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{env, error::Error};
 
 use crate::{
     clean_string,
@@ -56,5 +56,46 @@ pub async fn summarize(bot: Bot, message: Message, mut user: User) -> Result<(),
     user.update_last_message(content_message);
 
     set_user(user.clone()).await.unwrap();
+    Ok(())
+}
+
+pub async fn request(bot: Bot, message: Message) -> Result<(), Box<dyn Error>> {
+    let request_text = message
+        .text()
+        .unwrap()
+        .replace("/request", "")
+        .trim()
+        .to_string();
+
+    if request_text.is_empty() {
+        bot.send_message(
+            message.chat.id,
+            "Please provide a description of the feature you would like to see",
+        )
+        .send()
+        .await?;
+        return Ok(());
+    }
+    bot.send_message(
+        message.from().unwrap().id,
+        "Thank you so much for your request! We will get back to you soon.",
+    )
+    .send()
+    .await?;
+
+    let admin_id = env::var("ADMIN_ID").expect("Missing env variable ADMIN_ID");
+    let from = message.from().unwrap();
+    bot.send_message(
+        admin_id,
+        format!(
+            "New request from user:\n[{}]({})\n**Request**:\n{}",
+            from.clone().username.unwrap_or("Anon".to_string()),
+            from.clone().url(),
+            request_text
+        ),
+    )
+    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+    .send()
+    .await?;
     Ok(())
 }

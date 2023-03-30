@@ -1,4 +1,4 @@
-use bot::summarize;
+use bot::{request, summarize};
 use chrono::{TimeZone, Utc};
 use dotenvy::dotenv;
 use reqwest::Url;
@@ -39,6 +39,9 @@ enum BotCommands {
 
     #[command(description = "Clear your chat history")]
     Clear,
+
+    #[command(description = "Request a new feature for AIBuddy!")]
+    Request,
 }
 
 pub fn clean_string(s: String) -> String {
@@ -88,7 +91,7 @@ async fn bot_handler(
                 .trim()
                 .to_string();
 
-            if message_text.len() == 0 {
+            if message_text.is_empty() {
                 bot.send_message(message.chat.id, "Please provide a question")
                     .send()
                     .await?;
@@ -110,12 +113,25 @@ async fn bot_handler(
             set_user(user.clone()).await.unwrap();
         }
         BotCommands::Imagine => {
+            let message_text = message
+                .text()
+                .unwrap()
+                .replace("/ask", "")
+                .trim()
+                .to_string();
+
+            if message_text.is_empty() {
+                bot.send_message(message.chat.id, "Please provide a description of the image")
+                    .send()
+                    .await?;
+                return Ok(());
+            }
+
             bot.send_message(message.chat.id, "Hmmm.... let me think...")
                 .send()
                 .await?;
 
-            user.update_requests();
-            let response = send_image_prompt_to_openai(message.text().unwrap()).await;
+            let response = send_image_prompt_to_openai(message_text.as_str()).await;
             if response.is_err() {
                 bot.send_message(message.chat.id, response.err().unwrap())
                     .send()
@@ -127,10 +143,11 @@ async fn bot_handler(
                 )
                 .await?;
             }
+            user.update_requests();
             set_user(user.clone()).await.unwrap();
         }
         BotCommands::Pretend => {
-            user.pretend = Some(message.text().unwrap().replace("/pretend ", "").to_string());
+            user.pretend = Some(message.text().unwrap().replace("/pretend ", ""));
             bot.send_message(
                 message.chat.id,
                 format!(
@@ -165,6 +182,9 @@ async fn bot_handler(
                 .await?;
             set_user(user.clone()).await.unwrap();
         }
+        BotCommands::Request => {
+            request(bot, message).await.unwrap();
+        }
     }
 
     Ok(())
@@ -194,11 +214,11 @@ async fn private_message_handler(
         match message.kind.clone() {
             MessageKind::Common(message_data) => match message_data.media_kind {
                 MediaKind::Text(text_data) => {
-                    if let Some(_) = message
+                    if message
                         .entities()
                         .unwrap()
                         .iter()
-                        .find(|entity| entity.kind.eq(&MessageEntityKind::Url))
+                        .any(|entity| entity.kind.eq(&MessageEntityKind::Url))
                     {
                         summarize(bot, message, user).await.unwrap();
                     } else {
