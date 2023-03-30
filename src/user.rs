@@ -1,5 +1,6 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use surrealdb::Datastore;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
@@ -63,7 +64,7 @@ pub async fn init_user(
 }
 
 pub async fn get_user(id: &u64) -> Result<Option<User>, Box<dyn std::error::Error>> {
-    let db = surrealdb::Datastore::new(dotenvy::var("DB_ENDPOINT").unwrap().as_str()).await?;
+    let db = Datastore::new(dotenvy::var("DB_ENDPOINT").unwrap().as_str()).await?;
 
     let mut transaction = db.transaction(false, false).await?;
     let value = transaction.get(format!("user:{id}")).await?;
@@ -76,7 +77,7 @@ pub async fn get_user(id: &u64) -> Result<Option<User>, Box<dyn std::error::Erro
 }
 
 pub async fn set_user(user: User) -> Result<(), Box<dyn std::error::Error>> {
-    let db = surrealdb::Datastore::new(dotenvy::var("DB_ENDPOINT").unwrap().as_str()).await?;
+    let db = Datastore::new(dotenvy::var("DB_ENDPOINT").unwrap().as_str()).await?;
 
     let mut transaction = db.transaction(true, false).await?;
     transaction

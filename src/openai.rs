@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use tiktoken_rs::p50k_base;
+
 use std::env;
 
 use crate::user::User;
@@ -56,6 +58,14 @@ pub async fn send_text_to_chatgpt(message: &str, user: &User) -> Result<String, 
 
     let system_role = user.pretend.clone().unwrap_or("You are ChatGPT, a large language model trained by OpenAI. Answer as concisely as possible but clarify what data you base your answers on.".to_string());
 
+    let mut message = message.to_string();
+
+    let bpe = p50k_base().unwrap();
+    let tokens = bpe.encode_with_special_tokens(message.as_str());
+    if tokens.len() > 3024 {
+        message.truncate(11000);
+    }
+
     let mut messages: Vec<OpenAIMessage> = user
         .previous_messages
         .iter()
@@ -77,10 +87,9 @@ pub async fn send_text_to_chatgpt(message: &str, user: &User) -> Result<String, 
             role: "system".to_string(),
         },
     );
-
     let request_body = json!({
           "model": "gpt-3.5-turbo",
-          "messages": messages
+          "messages": messages.clone()
     });
 
     let client = reqwest::Client::new();

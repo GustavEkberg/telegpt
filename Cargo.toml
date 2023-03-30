@@ -16,4 +16,5 @@ tokio = { version =  "1.8", features = ["full"] }
 chrono = "0.4.24"
 scraper = "0.15.0"
 regex = "1.7.3"
+tiktoken-rs = "0.3.3"
 content_scraper = { git = "https://github.com/GustavEkberg/content_scaper", branch = "main" }
