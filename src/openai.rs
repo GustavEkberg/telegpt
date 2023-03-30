@@ -1,10 +1,8 @@
-use serde::{Deserialize, Serialize};
-use tiktoken_rs::p50k_base;
-
-use std::env;
-
 use crate::user::User;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::env;
+use tiktoken_rs::p50k_base;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct OpenAIMessage {
