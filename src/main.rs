@@ -15,7 +15,6 @@ use user::{init_user, set_user};
 use crate::openai::{send_image_prompt_to_openai, send_text_to_chatgpt};
 
 mod bot;
-mod content;
 mod openai;
 mod user;
 
@@ -98,7 +97,7 @@ async fn bot_handler(
                 return Ok(());
             }
 
-            bot.send_message(message.chat.id, "Hmmm.... let me think...")
+            bot.send_message(message.chat.id, "Hmmm... let me think...")
                 .send()
                 .await?;
 
@@ -127,7 +126,7 @@ async fn bot_handler(
                 return Ok(());
             }
 
-            bot.send_message(message.chat.id, "Hmmm.... let me think...")
+            bot.send_message(message.chat.id, "Hmmm... let me think...")
                 .send()
                 .await?;
 
@@ -177,10 +176,10 @@ async fn bot_handler(
         }
         BotCommands::Clear => {
             user.clear_history();
+            set_user(user.clone()).await.unwrap();
             bot.send_message(message.from().unwrap().id, "Chat history cleared!")
                 .send()
                 .await?;
-            set_user(user.clone()).await.unwrap();
         }
         BotCommands::Request => {
             request(bot, message).await.unwrap();
@@ -214,15 +213,16 @@ async fn private_message_handler(
         match message.kind.clone() {
             MessageKind::Common(message_data) => match message_data.media_kind {
                 MediaKind::Text(text_data) => {
-                    if message
+                    let url_position = message
                         .entities()
                         .unwrap()
                         .iter()
-                        .any(|entity| entity.kind.eq(&MessageEntityKind::Url))
-                    {
+                        .find(|entity| entity.kind.eq(&MessageEntityKind::Url));
+
+                    if url_position.is_some() && url_position.unwrap().offset == 0 {
                         summarize(bot, message, user).await.unwrap();
                     } else {
-                        bot.send_message(message.chat.id, "Hmmm.... let me think...")
+                        bot.send_message(message.chat.id, "Hmmm... let me think...")
                             .send()
                             .await?;
 

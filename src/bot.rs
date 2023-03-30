@@ -2,7 +2,6 @@ use std::{env, error::Error};
 
 use crate::{
     clean_string,
-    content::extract_url_content,
     openai::send_text_to_chatgpt,
     user::{set_user, User},
 };
@@ -12,8 +11,10 @@ use teloxide::{
     Bot,
 };
 
+use content_scraper::extract_url_content;
+
 pub async fn summarize(bot: Bot, message: Message, mut user: User) -> Result<(), Box<dyn Error>> {
-    bot.send_message(message.chat.id, "Hmmm.... let me think...")
+    bot.send_message(message.chat.id, "Hmmm... let me think...")
         .send()
         .await?;
 
@@ -78,7 +79,7 @@ pub async fn request(bot: Bot, message: Message) -> Result<(), Box<dyn Error>> {
     }
     bot.send_message(
         message.from().unwrap().id,
-        "Thank you so much for your request! We will get back to you soon.",
+        "Thank you for your request! I will get back to you soon :)",
     )
     .send()
     .await?;
