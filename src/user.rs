@@ -11,7 +11,7 @@ pub struct User {
     pub requests_left: u32,
     pub pretend: Option<String>,
     pub previous_messages: Vec<String>,
-    pub last_message: Option<u64>,
+    pub last_message: i64,
     pub total_request: u32,
     pub created_at: i64,
 }
@@ -24,7 +24,7 @@ impl User {
             requests_left: 666,
             pretend: None,
             previous_messages: Vec::new(),
-            last_message: None,
+            last_message: Utc::now().timestamp(),
             total_request: 0,
             created_at: Utc::now().timestamp(),
         }
@@ -43,6 +43,7 @@ impl User {
         if self.previous_messages.len() > 3 {
             self.previous_messages.remove(0);
         }
+        self.last_message = Utc::now().timestamp();
         self.previous_messages.push(message);
     }
 
