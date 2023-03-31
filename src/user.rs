@@ -1,6 +1,8 @@
+use std::error::Error;
+
+use crate::db::db_sql;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use surrealdb::Datastore;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
@@ -49,44 +51,25 @@ impl User {
     }
 }
 
-pub async fn init_user(
-    id: &u64,
-    username: Option<String>,
-) -> Result<User, Box<dyn std::error::Error>> {
+pub async fn init_user(id: &u64, username: Option<String>) -> Result<User, Box<dyn Error>> {
     let user = get_user(id)
         .await
         .unwrap()
         .unwrap_or(User::new(*id, username));
 
-    println!("USER: {user:#?}");
-
     Ok(user)
 }
 
-pub async fn get_user(id: &u64) -> Result<Option<User>, Box<dyn std::error::Error>> {
-    let db = Datastore::new(dotenvy::var("DB_ENDPOINT").unwrap().as_str()).await?;
-
-    let mut transaction = db.transaction(false, false).await?;
-    let value = transaction.get(format!("user:{id}")).await?;
-    if value.is_none() {
-        Ok(None)
-    } else {
-        let value = serde_json::from_slice(&value.unwrap()).unwrap();
-        Ok(value)
-    }
+pub async fn get_user(id: &u64) -> Result<Option<User>, Box<dyn Error>> {
+    let user = db_sql::<User>(format!("SELECT * FROM user:{id};").as_str()).await?;
+    Ok(user)
 }
 
-pub async fn set_user(user: User) -> Result<(), Box<dyn std::error::Error>> {
-    let db = Datastore::new(dotenvy::var("DB_ENDPOINT").unwrap().as_str()).await?;
+pub async fn set_user(user: User) -> Result<(), Box<dyn Error>> {
+    let user_string = serde_json::to_string(&user).unwrap();
 
-    let mut transaction = db.transaction(true, false).await?;
-    transaction
-        .set(
-            format!("user:{}", user.telegram_id),
-            serde_json::to_vec(&user).unwrap(),
-        )
-        .await?;
-    transaction.commit().await?;
+    let query = format!("UPDATE user:{} CONTENT {user_string}", user.telegram_id);
 
+    db_sql::<User>(query.as_str()).await?;
     Ok(())
 }

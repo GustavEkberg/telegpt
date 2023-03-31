@@ -15,6 +15,7 @@ use user::{init_user, set_user};
 use crate::openai::{send_image_prompt_to_openai, send_text_to_chatgpt};
 
 mod bot;
+mod db;
 mod openai;
 mod user;
 
