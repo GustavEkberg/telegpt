@@ -147,9 +147,10 @@ async fn bot_handler(
             bot.send_message(
                 message.from().unwrap().id,
                 format!(
-                    "You have preformed {} requests since {}.",
+                    "You have preformed a total of {} requests since {}.\nYou currently have {} requests left.",
                     user.total_request,
-                    Utc.timestamp_opt(user.created_at, 0).unwrap()
+                    Utc.timestamp_opt(user.created_at, 0).unwrap(),
+                    user.requests_left,
                 ),
             )
             .send()
