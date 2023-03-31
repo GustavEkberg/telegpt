@@ -54,8 +54,6 @@ pub async fn send_text_to_chatgpt(message: &str, user: &User) -> Result<String, 
 
     let chatgpt_api_url = "https://api.openai.com/v1/chat/completions";
 
-    let system_role = user.pretend.clone().unwrap_or("You are ChatGPT, a large language model trained by OpenAI. Answer as concisely as possible but clarify what data you base your answers on.".to_string());
-
     let mut message = message.to_string();
 
     let bpe = p50k_base().unwrap();
@@ -81,7 +79,7 @@ pub async fn send_text_to_chatgpt(message: &str, user: &User) -> Result<String, 
     messages.insert(
         0,
         OpenAIMessage {
-            content: system_role,
+            content:"You are AiBuddy, a friendly chatbot for Telegram. Answer as concisely as possible but clarify what data you base your answers on.".to_string(),
             role: "system".to_string(),
         },
     );

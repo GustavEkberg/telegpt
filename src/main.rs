@@ -28,9 +28,6 @@ enum BotCommands {
     #[command(description = "Generate an image")]
     Imagine,
 
-    #[command(description = "Pretend the bot to be something else")]
-    Pretend,
-
     #[command(description = "Display your status")]
     Status,
 
@@ -144,20 +141,6 @@ async fn bot_handler(
                 .await?;
             }
             user.update_requests();
-            set_user(user.clone()).await.unwrap();
-        }
-        BotCommands::Pretend => {
-            user.pretend = Some(message.text().unwrap().replace("/pretend ", ""));
-            bot.send_message(
-                message.chat.id,
-                format!(
-                    "From now on, I'll pretend \"{}\"",
-                    message.text().unwrap().replace("/pretend ", "")
-                ),
-            )
-            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-            .send()
-            .await?;
             set_user(user.clone()).await.unwrap();
         }
         BotCommands::Status => {
