@@ -2,12 +2,15 @@ use std::error::Error;
 
 use crate::db::db_sql;
 use chrono::Utc;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
     pub telegram_id: u64,
+    pub first_name: String,
     pub username: Option<String>,
+    pub url: Option<Url>,
     pub requests_left: u32,
     pub previous_messages: Vec<String>,
     pub last_message: i64,
@@ -16,11 +19,18 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(telegram_id: u64, username: Option<String>) -> Self {
+    pub fn new(
+        telegram_id: u64,
+        first_name: String,
+        username: Option<String>,
+        url: Option<Url>,
+    ) -> Self {
         Self {
             telegram_id,
+            first_name,
             username,
-            requests_left: 666,
+            url,
+            requests_left: 25,
             previous_messages: Vec::new(),
             last_message: Utc::now().timestamp(),
             total_request: 0,
@@ -50,11 +60,13 @@ impl User {
     }
 }
 
-pub async fn init_user(id: &u64, username: Option<String>) -> Result<User, Box<dyn Error>> {
-    let user = get_user(id)
-        .await
-        .unwrap()
-        .unwrap_or(User::new(*id, username));
+pub async fn init_user(id: &u64, user: teloxide::types::User) -> Result<User, Box<dyn Error>> {
+    let user = get_user(id).await.unwrap().unwrap_or(User::new(
+        *id,
+        user.clone().first_name,
+        user.clone().username,
+        user.tme_url(),
+    ));
 
     Ok(user)
 }

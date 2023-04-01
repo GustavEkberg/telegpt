@@ -69,7 +69,7 @@ async fn bot_handler(
     cmd: BotCommands,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let user_id = message.from().unwrap().id;
-    let mut user = init_user(&user_id.0, message.from().unwrap().username.clone())
+    let mut user = init_user(&user_id.0, message.from().clone().unwrap().to_owned())
         .await
         .unwrap();
 
@@ -182,7 +182,7 @@ async fn private_message_handler(
         Ok(())
     } else {
         let user_id = message.from().unwrap().id;
-        let mut user = init_user(&user_id.0, message.from().unwrap().username.clone())
+        let mut user = init_user(&user_id.0, message.from().clone().unwrap().to_owned())
             .await
             .unwrap();
 
