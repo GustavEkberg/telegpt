@@ -113,7 +113,8 @@ async fn bot_handler(
             let message_text = message
                 .text()
                 .unwrap()
-                .replace("/ask", "")
+                .replace("/imagine", "")
+                .replace("@stinacolada_bot", "")
                 .trim()
                 .to_string();
 
